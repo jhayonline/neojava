@@ -64,6 +64,25 @@ Making sure the tool works from ANY directory and creates proper nested folders 
 
 ## Features
 
+### Create New Project
+
+```bash
+# Create a new Java project (Maven based)
+neojava new MyApp
+
+# Create with custom group ID
+neojava new MyApp --group-id com.mycompany
+
+# Create in specific location
+neojava new MyApp --path ~/projects
+
+# What gets created:
+# - Standard Maven project structure (src/main/java, src/test/java)
+# - pom.xml with Java 21 configuration
+# - .gitignore file
+# - Ready to build with Maven
+```
+
 ### Regular Java
 
 ```bash
@@ -163,14 +182,32 @@ neojava make class StringUtils --package com.example.utils
 neojava make class DemoApplication --main --package com.example
 ```
 
+### Run Java Files
+
+```bash
+# Compile and run a Java file
+neojava run Main.java
+
+# You can omit the .java extension
+neojava run Main
+
+# Pass arguments to your program
+neojava run MyApp --arg1 value1 --arg2
+
+# What happens:
+# 1. Compiles the Java file with javac
+# 2. If compilation succeeds, runs the class with java
+# 3. Passes any additional arguments to your program
+```
+
 ## What's Next?
 
 I might add:
 
 - More templates (DTOs, mappers, exceptions)
 - Configuration file for custom templates
-- Integration with Spring Initializr
-- Maven/Gradle project generation
+- Support for Gradle projects
+- Option to add common dependencies
 
 ## The "Aha!" Moment
 

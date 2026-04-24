@@ -4,12 +4,13 @@ use clap::{Parser, Subcommand};
 use std::fs;
 use std::io::Write;
 use std::path::Path;
+use std::process::Command as ProcessCommand;
 
 /// Java file generator for Neovim
 #[derive(Parser)]
 #[command(name = "neojava")]
 #[command(about = "Generate Java class files with boilerplate", long_about = None)]
-#[command(version = "0.2.0")]
+#[command(version = "0.3.0")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -17,6 +18,30 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Create a new Java project
+    New {
+        /// Name of the project
+        name: String,
+
+        /// Group ID for Maven (default: com.example)
+        #[arg(short, long, default_value = "com.example")]
+        group_id: String,
+
+        /// Path where to create the project (default: current directory)
+        #[arg(short, long, default_value = ".")]
+        path: String,
+    },
+
+    /// Run a Java file (compile + execute)
+    Run {
+        /// Name of the Java file (with or without .java extension)
+        file: String,
+
+        /// Arguments to pass to the Java program
+        #[arg(last = true)]
+        args: Vec<String>,
+    },
+
     /// Create a Java file
     Make {
         /// Type of file to create
@@ -46,7 +71,6 @@ enum Commands {
         spring_type: SpringType,
 
         /// Name of the file (e.g., User for UserController)
-        #[arg(value_enum)]
         name: String,
 
         /// Path where to create the file (default: current directory)
@@ -86,6 +110,16 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
+        Commands::New {
+            name,
+            group_id,
+            path,
+        } => {
+            create_java_project(&name, &group_id, &path)?;
+        }
+        Commands::Run { file, args } => {
+            run_java_file(&file, &args)?;
+        }
         Commands::Make {
             file_type,
             name,
@@ -107,6 +141,150 @@ fn main() -> Result<()> {
             list_templates();
         }
     }
+
+    Ok(())
+}
+
+fn run_java_file(file: &str, args: &[String]) -> Result<()> {
+    // Handle file name with or without .java extension
+    let file_name = if file.ends_with(".java") {
+        file.to_string()
+    } else {
+        format!("{}.java", file)
+    };
+
+    let class_name = file_name.trim_end_matches(".java");
+
+    // Check if file exists
+    if !Path::new(&file_name).exists() {
+        anyhow::bail!("File not found: {}", file_name);
+    }
+
+    println!("🔨 Compiling {}...", file_name);
+
+    // Compile the Java file
+    let compile_status = ProcessCommand::new("javac")
+        .arg(&file_name)
+        .status()
+        .context("Failed to run javac. Make sure Java JDK is installed.")?;
+
+    if !compile_status.success() {
+        anyhow::bail!("Compilation failed");
+    }
+
+    println!("✅ Compilation successful!");
+    println!("🚀 Running {}...", class_name);
+    println!("{}", "=".repeat(50));
+
+    // Run the compiled class
+    let run_status = ProcessCommand::new("java")
+        .arg(class_name)
+        .args(args)
+        .status()
+        .context("Failed to run java")?;
+
+    if !run_status.success() {
+        anyhow::bail!("Execution failed");
+    }
+
+    Ok(())
+}
+
+fn create_java_project(name: &str, group_id: &str, path: &str) -> Result<()> {
+    let project_path = Path::new(path).join(name);
+
+    if project_path.exists() {
+        anyhow::bail!("Project directory already exists: {:?}", project_path);
+    }
+
+    println!("🚀 Creating Java project: {}", name);
+
+    // Create directory structure
+    let src_path = project_path.join("src/main/java");
+    let test_path = project_path.join("src/test/java");
+    fs::create_dir_all(&src_path)?;
+    fs::create_dir_all(&test_path)?;
+
+    // Create pom.xml
+    let pom_content = format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    
+    <groupId>{}</groupId>
+    <artifactId>{}</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    
+    <properties>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+    
+    <dependencies>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.10.0</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+    
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <configuration>
+                    <mainClass>{}.Main</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+"#,
+        group_id, name, group_id
+    );
+
+    let pom_path = project_path.join("pom.xml");
+    let mut pom_file = fs::File::create(&pom_path)?;
+    pom_file.write_all(pom_content.as_bytes())?;
+
+    // Create .gitignore
+    let gitignore_content = r#"target/
+*.class
+.settings/
+.project
+.classpath
+.DS_Store
+"#;
+    let gitignore_path = project_path.join(".gitignore");
+    let mut gitignore_file = fs::File::create(&gitignore_path)?;
+    gitignore_file.write_all(gitignore_content.as_bytes())?;
+
+    println!("  ✓ Created Maven project structure");
+    println!("  ✓ Generated pom.xml");
+    println!("  ✓ Created .gitignore");
+    println!(
+        "\n✅ Project created successfully at: {}",
+        project_path.display()
+    );
+    println!("\nNext steps:");
+    println!("  cd {}", name);
+    println!("  neojava make class Main --main");
+    println!("\nBuild with:");
+    println!("  mvn clean compile");
+    println!("  mvn exec:java -Dexec.mainClass={}.Main", group_id);
 
     Ok(())
 }
@@ -535,59 +713,53 @@ public class {} {{
 fn list_templates() {
     println!("📦 Available Java templates:");
     println!();
-    println!("  neojava make class <Name> [OPTIONS]");
-    println!("    - Creates a Java class");
-    println!("    - Use --main to add main method");
+    println!("  🏃 Run a Java file:");
+    println!("    neojava run <file>");
+    println!("    neojava run Main.java");
+    println!("    neojava run Main --arg1 --arg2");
     println!();
-    println!("  neojava make interface <Name> [OPTIONS]");
-    println!("    - Creates a Java interface");
+    println!("  🆕 Create a new project:");
+    println!("    neojava new <name>");
+    println!("    neojava new <name> --group-id com.mycompany");
+    println!("    neojava new <name> --path ./projects");
     println!();
-    println!("  neojava make enum <Name> [OPTIONS]");
-    println!("    - Creates a Java enum");
+    println!("  📁 Regular Java files:");
+    println!("    neojava make class <Name> [OPTIONS]");
+    println!("    neojava make interface <Name> [OPTIONS]");
+    println!("    neojava make enum <Name> [OPTIONS]");
+    println!("    neojava make record <Name> [OPTIONS]");
+    println!("    neojava make abstract-class <Name> [OPTIONS]");
+    println!("    neojava make sealed-class <Name> [OPTIONS]");
     println!();
-    println!("  neojava make record <Name> [OPTIONS]");
-    println!("    - Creates a Java record");
-    println!();
-    println!("  neojava make abstract-class <Name> [OPTIONS]");
-    println!("    - Creates an abstract class");
-    println!();
-    println!("  neojava make sealed-class <Name> [OPTIONS]");
-    println!("    - Creates a sealed class");
-    println!();
-    println!("🍃 Spring Boot templates:");
-    println!();
-    println!("  neojava spring controller <Name> [OPTIONS]");
-    println!("    - Creates a Spring MVC Controller");
-    println!();
-    println!("  neojava spring rest-controller <Name> [OPTIONS]");
-    println!("    - Creates a REST Controller with full CRUD");
-    println!();
-    println!("  neojava spring service <Name> [OPTIONS]");
-    println!("    - Creates a Service layer class");
-    println!();
-    println!("  neojava spring repository <Name> [OPTIONS]");
-    println!("    - Creates a Repository interface");
-    println!();
-    println!("  neojava spring configuration <Name> [OPTIONS]");
-    println!("    - Creates a Configuration class");
-    println!();
-    println!("  neojava spring component <Name> [OPTIONS]");
-    println!("    - Creates a Component");
+    println!("  🍃 Spring Boot files:");
+    println!("    neojava spring controller <Name> [OPTIONS]");
+    println!("    neojava spring rest-controller <Name> [OPTIONS]");
+    println!("    neojava spring service <Name> [OPTIONS]");
+    println!("    neojava spring repository <Name> [OPTIONS]");
+    println!("    neojava spring configuration <Name> [OPTIONS]");
+    println!("    neojava spring component <Name> [OPTIONS]");
     println!();
     println!("Options:");
-    println!("  -p, --path <PATH>     Directory to create file (default: .)");
+    println!("  -p, --path <PATH>     Directory to create file/project (default: .)");
     println!("  --package <PKG>       Package declaration");
+    println!("  --group-id <ID>       Maven group ID (default: com.example)");
     println!("  --main                Add main method (class only)");
     println!();
     println!("Examples:");
+    println!("  # Run a Java file");
+    println!("  neojava run Main.java");
+    println!("  neojava run MyApp --verbose --config=settings.json");
+    println!();
+    println!("  # Create a new project");
+    println!("  neojava new MyApp");
+    println!("  neojava new MyApp --group-id com.mycompany");
+    println!("  neojava new MyApp --path ~/projects");
+    println!();
     println!("  # Regular Java");
     println!("  neojava make class User --package com.example.models");
-    println!("  neojava make class Application --main");
-    println!("  neojava make abstract-class BaseService");
+    println!("  neojava make class Main --main");
     println!();
     println!("  # Spring Boot");
     println!("  neojava spring rest-controller User");
     println!("  neojava spring service User --package com.example.services");
-    println!("  neojava spring repository User");
-    println!("  neojava spring configuration Security");
 }

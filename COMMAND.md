@@ -218,6 +218,74 @@ neojava list
 neojava --version
 ```
 
+## 🆕 Project Creation Commands
+
+```bash
+# Create a new Java project
+neojava new MyApp
+
+# Create with custom group ID
+neojava new MyApp --group-id com.mycompany
+
+# Create in specific directory
+neojava new MyApp --path ~/projects
+
+# What this creates:
+neojava new MyApp
+# Output:
+# 🚀 Creating Java project: MyApp
+#   ✓ Created Maven project structure
+#   ✓ Generated pom.xml
+#   ✓ Created .gitignore
+#
+# ✅ Project created successfully at: ./MyApp
+#
+# Next steps:
+#   cd MyApp
+#   neojava make class Main --main
+#
+# Build with:
+#   mvn clean compile
+#   mvn exec:java -Dexec.mainClass=com.example.Main
+```
+
+## Run Commands
+
+```bash
+# Compile and run a Java file
+neojava run Main.java
+
+# Omit the .java extension
+neojava run Main
+
+# Run with program arguments
+neojava run Calculator 5 + 3
+neojava run MyApp --verbose --config=settings.json
+
+# What neojava run does:
+# 1. Checks if the .java file exists
+# 2. Runs `javac <file>.java`
+# 3. If compilation succeeds, runs `java <class>`
+# 4. Passes any extra arguments to your program
+
+# Example with a simple program:
+# File: Hello.java
+# public class Hello {
+#     public static void main(String[] args) {
+#         System.out.println("Hello, " + args[0]);
+#     }
+# }
+
+$ neojava run Hello.java World
+# 🔨 Compiling Hello.java...
+# ✅ Compilation successful!
+# 🚀 Running Hello...
+# ==================================================
+# Hello, World!
+```
+
+````
+
 ## 💡 Pro Tips
 
 ### In Neovim (with keymaps configured)
@@ -279,3 +347,4 @@ neojava make class Product --package com.example.models
 # 3. Open in Neovim and start coding
 nvim ProductController.java
 ```
+````
