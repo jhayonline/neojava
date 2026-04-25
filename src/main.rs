@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use chrono::Local;
 use clap::{Parser, Subcommand};
 use std::fs;
 use std::io::Write;
@@ -171,10 +170,8 @@ fn run_java_file(file: &str, args: &[String]) -> Result<()> {
     if !compile_status.success() {
         anyhow::bail!("Compilation failed");
     }
-
-    println!("✅ Compilation successful!");
-    println!("🚀 Running {}...", class_name);
     println!("{}", "=".repeat(50));
+    println!();
 
     // Run the compiled class
     let run_status = ProcessCommand::new("java")
@@ -186,6 +183,8 @@ fn run_java_file(file: &str, args: &[String]) -> Result<()> {
     if !run_status.success() {
         anyhow::bail!("Execution failed");
     }
+
+    println!();
 
     Ok(())
 }
@@ -419,13 +418,10 @@ fn generate_java_content(
     package: Option<&str>,
     add_main: bool,
 ) -> String {
-    let date = Local::now().format("%Y-%m-%d");
     let package_decl = match package {
         Some(pkg) => format!("package {};\n\n", pkg),
         None => String::new(),
     };
-
-    let header = format!("/*\n * {}.java\n * Created on {}\n */\n\n", name, date);
 
     let body = match file_type {
         JavaType::Class => generate_class(name, add_main),
@@ -436,7 +432,7 @@ fn generate_java_content(
         JavaType::SealedClass => generate_sealed_class(name),
     };
 
-    format!("{}{}{}", header, package_decl, body)
+    format!("{}{}", package_decl, body)
 }
 
 fn generate_class(name: &str, add_main: bool) -> String {
@@ -500,7 +496,6 @@ fn generate_sealed_class(name: &str) -> String {
 }
 
 fn generate_spring_content(spring_type: &SpringType, name: &str, package: Option<&str>) -> String {
-    let date = Local::now().format("%Y-%m-%d");
     let package_decl = match package {
         Some(pkg) => format!("package {};\n\n", pkg),
         None => {
@@ -515,20 +510,6 @@ fn generate_spring_content(spring_type: &SpringType, name: &str, package: Option
             format!("package {};\n\n", default_pkg)
         }
     };
-
-    let header = format!(
-        "/*\n * {}{}.java\n * Created on {}\n */\n\n",
-        name,
-        match spring_type {
-            SpringType::Controller => "Controller",
-            SpringType::RestController => "Controller",
-            SpringType::Service => "Service",
-            SpringType::Repository => "Repository",
-            SpringType::Configuration => "Config",
-            SpringType::Component => "",
-        },
-        date
-    );
 
     let imports = match spring_type {
         SpringType::Controller => {
@@ -554,7 +535,7 @@ fn generate_spring_content(spring_type: &SpringType, name: &str, package: Option
         SpringType::Component => generate_component(name),
     };
 
-    format!("{}{}{}{}", header, package_decl, imports, body)
+    format!("{}{}{}", package_decl, imports, body)
 }
 
 fn generate_controller(name: &str) -> String {
