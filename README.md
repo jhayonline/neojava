@@ -83,6 +83,43 @@ neojava new MyApp --path ~/projects
 # - Ready to build with Maven
 ```
 
+### Create a Spring Boot Project
+
+```bash
+# Create new Spring Boot project (interactive)
+neojava new spring myapp
+
+# You'll be prompted for:
+# - Dependencies (web, data-jpa, lombok, postgresql, etc.)
+# - GroupId (default: dev.jhayonline)
+
+# Navigate into project
+cd myapp
+
+# Run the application
+neojava spring run
+```
+
+### Create full CRUD API for User entity
+
+```bash
+neojava spring entity User        # JPA Entity
+neojava spring dto User           # Data Transfer Object
+neojava spring mapper User        # MapStruct mapper
+neojava spring repository User    # JPA Repository
+neojava spring impl User          # Service with implementation
+neojava spring rest-controller User # REST Controller
+neojava spring exception UserNotFound # Custom exception
+```
+
+### Inside your Spring Boot project
+
+```bash
+neojava spring run        # Start the app on port 8080
+neojava spring compile    # Compile the project
+neojava spring package    # Create JAR file
+```
+
 ### Regular Java
 
 ```bash
